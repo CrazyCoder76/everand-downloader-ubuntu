@@ -9,18 +9,23 @@ import shutil
 
 ZOOM = 0.625
 
+# Ensure the book URL is passed as an argument when running the script
+if len(sys.argv) < 2:
+    print("Usage: python script.py <book_url>")
+    sys.exit(1)
+
 book_url = sys.argv[1]
 
 # create cache dir
 book_filename = book_url.split('/')[5]
-cache_dir = f'{os.getcwd()}/{book_filename}'
+cache_dir = os.path.join(os.getcwd(), book_filename)  # Use os.path.join for cross-platform compatibility
 try:
 	os.mkdir(cache_dir)
 except FileExistsError:
 	pass
 
 with sync_playwright() as playwright:
-	browser = playwright.chromium.launch(headless=False)
+	browser = playwright.chromium.launch(headless=False, args=['--no-sandbox'])  # Added '--no-sandbox' for running as root user in Ubuntu, if necessary.
 	context = browser.new_context(storage_state="session.json" if 'session.json' in os.listdir('.') else None)
 
 	page = context.new_page()
@@ -34,15 +39,15 @@ with sync_playwright() as playwright:
 	context.close()
 	browser.close()
 
-	browser = playwright.chromium.launch(headless=True)
+	browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])  # Same here for '--no-sandbox'
 
 	print('Loading viewer...')
 
 	context = browser.new_context(
-		storage_state=  "session.json",
+		storage_state = "session.json",
 		viewport={'width': 1200, 'height': 1600},
 		ignore_https_errors = True,
-		user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36'
+		user_agent = 'Mozilla/5.0 (Linux; Ubuntu 20.04) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36'
 	)
 	context.set_extra_http_headers({'Accept-Language': 'en-US,en;q=0.9'})
 

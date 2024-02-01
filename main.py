@@ -2,9 +2,10 @@ import pymongo
 import concurrent.futures
 import subprocess
 import shutil
+import os
 
 # Replace these variables with your MongoDB connection details
-mongo_host = "127.0.0.1"
+mongo_host = "38.102.87.184"
 mongo_port = 27017  # Default MongoDB port
 mongo_database = "bookUrlList"
 mongo_collection = "books"
@@ -26,17 +27,19 @@ def run_script(argument):
         book_url = argument["url"]
         cache_dir = book_url.split('/')[5]
 
-        process = subprocess.Popen(["python", "run.py", book_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(["python3", "run.py", book_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
 
         # Check if run.py ran successfully
         if process.returncode == 0:
             return f"successfully download {book_id} {book_title}"
         else:
-            shutil.rmtree(cache_dir)
+            if cache_dir and os.path.exists(cache_dir):
+                shutil.rmtree(cache_dir)
             return f"failed download {book_id} {book_title}"
     except Exception as e:
-        shutil.rmtree(cache_dir)
+        if cache_dir and os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
         return f"failed download {book_id} {book_title}"
 
 # Number of total script2.py instances
