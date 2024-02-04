@@ -15,144 +15,156 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 book_url = sys.argv[1]
-
-# create cache dir
 book_filename = book_url.split('/')[5]
 cache_dir = os.path.join(os.getcwd(), book_filename)  # Use os.path.join for cross-platform compatibility
-try:
+
+if not os.path.exists(cache_dir):
 	os.mkdir(cache_dir)
-except FileExistsError:
-	pass
 
-with sync_playwright() as playwright:
-	browser = playwright.chromium.launch(headless=False, args=['--no-sandbox'])  # Added '--no-sandbox' for running as root user in Ubuntu, if necessary.
-	context = browser.new_context(storage_state="session.json" if 'session.json' in os.listdir('.') else None)
+def main():
+	browser = None
+	context = None
+	try:
+		with sync_playwright() as playwright:
+			browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])  # Added '--no-sandbox' for running as root user in Ubuntu, if necessary.
+			context = browser.new_context(storage_state="session.json" if 'session.json' in os.listdir('.') else None)
 
-	page = context.new_page()
-	page.goto('https://www.everand.com', wait_until='domcontentloaded')
+			page = context.new_page()
+			page.goto('https://www.everand.com', wait_until='domcontentloaded')
 
-	page.locator("div.user_row").wait_for(state='attached', timeout=0)
+			page.locator("div.user_row").wait_for(state='attached', timeout=0)
 
-	print('Logged in successfully.')
+			print('Logged in successfully.')
 
-	storage = context.storage_state(path="session.json")
-	context.close()
-	browser.close()
+			storage = context.storage_state(path="session.json")
+			context.close()
+			browser.close()
 
-	browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])  # Same here for '--no-sandbox'
+			browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])  # Same here for '--no-sandbox'
 
-	print('Loading viewer...')
+			print('Loading viewer...')
 
-	context = browser.new_context(
-		storage_state = "session.json",
-		viewport={'width': 1200, 'height': 1600},
-		ignore_https_errors = True,
-		user_agent = 'Mozilla/5.0 (Linux; Ubuntu 20.04) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36'
-	)
-	context.set_extra_http_headers({'Accept-Language': 'en-US,en;q=0.9'})
+			context = browser.new_context(
+				storage_state = "session.json",
+				viewport={'width': 1200, 'height': 1600},
+				ignore_https_errors = True,
+				user_agent = 'Mozilla/5.0 (Linux; Ubuntu 20.04) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36'
+			)
+			context.set_extra_http_headers({'Accept-Language': 'en-US,en;q=0.9'})
 
-	page = context.new_page()
-	page.goto(book_url.replace('book', 'read'))
+			page = context.new_page()
+			page.goto(book_url.replace('book', 'read'))
 
-	if 'Browser limit exceeded' in page.content():
-		context.close()
-		browser.close()
-		sys.exit('You have tried to read this from too many computers or web browsers recently, and will need to wait up to 24 hours before returning to this book.')
+			if 'Browser limit exceeded' in page.content():
+				context.close()
+				browser.close()
+				sys.exit('You have tried to read this from too many computers or web browsers recently, and will need to wait up to 24 hours before returning to this book.')
 
-	# retrieve fonts
-	font_style = page.locator('#fontfaces').inner_html()
+			# retrieve fonts
+			font_style = page.locator('#fontfaces').inner_html()
 
-	# open display menu
-	page.locator('.icon-ic_displaysettings').wait_for(state='visible')
-	page.evaluate("() => document.querySelector('.icon-ic_displaysettings').click()")
+			# open display menu
+			page.locator('.icon-ic_displaysettings').wait_for(state='visible')
+			page.evaluate("() => document.querySelector('.icon-ic_displaysettings').click()")
 
-	# change to vertical mode
-	page.locator('.vertical_mode_btn').wait_for(state='visible')
-	page.evaluate("() => document.querySelector('.vertical_mode_btn').click()")
+			# change to vertical mode
+			page.locator('.vertical_mode_btn').wait_for(state='visible')
+			page.evaluate("() => document.querySelector('.vertical_mode_btn').click()")
 
-	# open toc menu
-	page.locator('div.vertical_page[data-page="0"]').wait_for(state='visible')
-	page.evaluate("() => document.querySelector('.icon-ic_toc_list').click()")
-	chapter_selector = page.locator('li.text_btn[role="none"]')
-	chapter_selector.nth(0).wait_for(state='visible')
+			# open toc menu
+			page.locator('div.vertical_page[data-page="0"]').wait_for(state='visible')
+			page.evaluate("() => document.querySelector('.icon-ic_toc_list').click()")
+			chapter_selector = page.locator('li.text_btn[role="none"]')
+			chapter_selector.nth(0).wait_for(state='visible')
 
-	# retrieve the number of chapters
-	num_of_chapters = chapter_selector.count()
+			# retrieve the number of chapters
+			num_of_chapters = chapter_selector.count()
 
-	# load the first chapter
-	page.evaluate("() => document.querySelector('li.text_btn[data-idx=\"0\"]').click()")
-	chapter_no = 1
+			# load the first chapter
+			page.evaluate("() => document.querySelector('li.text_btn[data-idx=\"0\"]').click()")
+			chapter_no = 1
 
-	# to render the chapter pages and save them as pdf
-	render_page = context.new_page()
-	render_page.set_viewport_size({"width": 1200, "height": 1600})
+			# to render the chapter pages and save them as pdf
+			render_page = context.new_page()
+			render_page.set_viewport_size({"width": 1200, "height": 1600})
 
-	while True:
+			while True:
 
-		page.locator('div.vertical_page[data-page="0"]').wait_for()
+				page.locator('div.vertical_page[data-page="0"]').wait_for()
 
-		chapter_pages = page.locator('div.vertical_page')
-		number_of_chapter_pages = chapter_pages.count()
+				chapter_pages = page.locator('div.vertical_page')
+				number_of_chapter_pages = chapter_pages.count()
 
-		print(f'Downloading chapter {chapter_no}/{num_of_chapters} ({number_of_chapter_pages} pages)')
+				print(f'Downloading chapter {chapter_no}/{num_of_chapters} ({number_of_chapter_pages} pages)')
 
+				merger = PdfMerger()
+
+				page_no = 1
+
+				while True:
+
+					page_elem = chapter_pages.nth(page_no-1)
+					html = page_elem.inner_html()
+
+					# replace img urls
+					html = html.replace('src="/', 'src="https://www.everand.com/')
+
+					# set page size
+					match = re.findall('width: ([0-9.]+)px; height: ([0-9.]+)px;', html)[0]
+					width, height = float(match[0]), float(match[1])
+					style = f'@page {{ size: {width*ZOOM}px {height*ZOOM}px; margin: 0; }} @media print {{ html, body {{ height: {height*ZOOM}px; width: {width*ZOOM}px;}}}}'
+					html = re.sub('data-colindex="0" style="', 'data-colindex="0" x="', html)
+					html = re.sub('position: absolute.*?"', f'overflow: hidden; height: {height}px; width: {width}px; white-space: nowrap; zoom: {ZOOM};"', html)
+
+					# render page
+					content = f'<style>{style}{font_style}</style>{html}'
+					render_page.set_content(content)
+
+					# print pdf
+					pdf_file = f'{cache_dir}/{chapter_no}_{page_no}.pdf'
+					render_page.pdf(path=pdf_file, prefer_css_page_size = True)
+					merger.append(pdf_file)
+
+					if page_no == number_of_chapter_pages:
+						merger.write(f"{cache_dir}/{chapter_no}.pdf")
+						merger.close()
+						break
+
+					page_no += 1
+
+				if chapter_no == num_of_chapters:
+					break
+
+				try:
+					page.evaluate("() => document.querySelectorAll('button.load_next_btn')[0].click()")
+				except Exception as e:
+					num_of_chapters = chapter_no
+					break
+
+				time.sleep(1)
+				chapter_no += 1
+
+		print('Merging PDF pages...')
 		merger = PdfMerger()
 
-		page_no = 1
+		for chapter_no in range(1, num_of_chapters+1):
+			merger.append(f"{cache_dir}/{chapter_no}.pdf")
 
-		while True:
+		merger.write(f"{book_filename}.pdf")
+		merger.close()
 
-			page_elem = chapter_pages.nth(page_no-1)
-			html = page_elem.inner_html()
+		# delete cache dir
+		shutil.rmtree(cache_dir)
 
-			# replace img urls
-			html = html.replace('src="/', 'src="https://www.everand.com/')
+		print('Download completed, enjoy your book!')
+	except Exception as e:
+		print(f"An error occurred: {e}")
+	finally:
+		# Close browser and context explicitly if they were created
+		if context:
+			context.close()
+		if browser:
+			browser.close()
 
-			# set page size
-			match = re.findall('width: ([0-9.]+)px; height: ([0-9.]+)px;', html)[0]
-			width, height = float(match[0]), float(match[1])
-			style = f'@page {{ size: {width*ZOOM}px {height*ZOOM}px; margin: 0; }} @media print {{ html, body {{ height: {height*ZOOM}px; width: {width*ZOOM}px;}}}}'
-			html = re.sub('data-colindex="0" style="', 'data-colindex="0" x="', html)
-			html = re.sub('position: absolute.*?"', f'overflow: hidden; height: {height}px; width: {width}px; white-space: nowrap; zoom: {ZOOM};"', html)
-
-			# render page
-			content = f'<style>{style}{font_style}</style>{html}'
-			render_page.set_content(content)
-
-			# print pdf
-			pdf_file = f'{cache_dir}/{chapter_no}_{page_no}.pdf'
-			render_page.pdf(path=pdf_file, prefer_css_page_size = True)
-			merger.append(pdf_file)
-
-			if page_no == number_of_chapter_pages:
-				merger.write(f"{cache_dir}/{chapter_no}.pdf")
-				merger.close()
-				break
-
-			page_no += 1
-
-		if chapter_no == num_of_chapters:
-			break
-
-		try:
-			page.evaluate("() => document.querySelectorAll('button.load_next_btn')[0].click()")
-		except Exception as e:
-			num_of_chapters = chapter_no
-			break
-
-		time.sleep(1)
-		chapter_no += 1
-
-print('Merging PDF pages...')
-merger = PdfMerger()
-
-for chapter_no in range(1, num_of_chapters+1):
-	merger.append(f"{cache_dir}/{chapter_no}.pdf")
-
-merger.write(f"{book_filename}.pdf")
-merger.close()
-
-# delete cache dir
-shutil.rmtree(cache_dir)
-
-print('Download completed, enjoy your book!')
+if __name__ == "__main__":
+    main()
