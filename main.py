@@ -44,7 +44,6 @@ concurrent_limit = 100
 for offset in range(0, total_documents, batch_size):
     batch = collection.find().skip(offset).limit(batch_size)
     with concurrent.futures.ProcessPoolExecutor(max_workers=concurrent_limit) as executor:
-        # Submit tasks to run script2.py concurrently
         futures = [executor.submit(run_script, arg) for arg in batch]
 
         # Wait for all tasks to complete and print results
