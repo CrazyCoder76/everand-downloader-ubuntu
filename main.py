@@ -35,10 +35,10 @@ def run_script(argument):
         return f"failed exception {book_id} {book_title}"
 
 total_documents = collection.count_documents({})
-batch_size = 100  # Process documents in batches of 100
+batch_size = 300  # Process documents in batches of 300
 
 # Number of instances to run concurrently
-concurrent_limit = 10
+concurrent_limit = 100
 
 # Create a ProcessPoolExecutor with the concurrent limit
 for offset in range(0, total_documents, batch_size):
