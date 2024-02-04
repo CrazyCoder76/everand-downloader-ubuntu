@@ -35,7 +35,7 @@ def run_script(argument):
         return f"failed exception {book_id} {book_title}"
 
 total_documents = collection.count_documents({})
-batch_size = 300  # Process documents in batches of 300
+batch_size = 500  # Process documents in batches of 500
 
 # Number of instances to run concurrently
 concurrent_limit = 100
